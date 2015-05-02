@@ -26,7 +26,7 @@ Instagram.set('client_id', INSTAGRAM_CLIENT_ID);
 Instagram.set('client_secret', INSTAGRAM_CLIENT_SECRET);
 
 //connect to database
-mongoose.connect(process.env.MONGODB_CONNECTION_URL);
+mongoose.connect(process.env.MONGODB_CONNECTION_LOCAL);
 var db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', function (callback) {
@@ -151,7 +151,7 @@ app.get('/account', ensureAuthenticated, function(req, res){
   res.render('account', {user: req.user});
 });
 
-app.get('/igphotos', ensureAuthenticatedInstagram, function(req, res){
+app.get('/photos', ensureAuthenticatedInstagram, function(req, res){
   var query  = models.User.where({ ig_id: req.user.ig_id });
   query.findOne(function (err, user) {
     if (err) return err;
@@ -177,6 +177,7 @@ app.get('/igphotos', ensureAuthenticatedInstagram, function(req, res){
 });
 
 app.get('/igMediaCounts', ensureAuthenticatedInstagram, function(req, res){
+
   var query  = models.User.where({ ig_id: req.user.ig_id });
   query.findOne(function (err, user) {
     if (err) return err;
@@ -189,6 +190,8 @@ app.get('/igMediaCounts', ensureAuthenticatedInstagram, function(req, res){
           var asyncTasks = [];
           var mediaCounts = [];
            
+          
+
           data.forEach(function(item){
             asyncTasks.push(function(callback){
               // asynchronous function!
@@ -197,12 +200,13 @@ app.get('/igMediaCounts', ensureAuthenticatedInstagram, function(req, res){
                   access_token: user.ig_access_token,
                   complete: function(data) {
                     mediaCounts.push(data);
+
                     callback();
                   }
                 });            
             });
           });
-          
+          //{users: mediaCounts}
           // Now we have an array of functions, each containing an async task
           // Execute all async tasks in the asyncTasks array
           async.parallel(asyncTasks, function(err){
@@ -215,6 +219,52 @@ app.get('/igMediaCounts', ensureAuthenticatedInstagram, function(req, res){
     }
   });
 });
+
+app.get('/igMediaPop', ensureAuthenticatedInstagram, function(req, res){
+
+  var query  = models.User.where({ ig_id: req.user.ig_id });
+  query.findOne(function (err, user) {
+    if (err) return err;
+    if (user) {
+       Instagram.media.popular({ 
+        user_id: user.ig_id,
+        access_token: user.ig_access_token,
+        complete: function(data) {
+          // an array of asynchronous functions
+          var asyncTasks = [];
+          var mediaCounts = [];
+           
+          
+
+          data.forEach(function(item){
+            asyncTasks.push(function(callback){
+              // asynchronous function!
+              Instagram.media.popular({ 
+                  user_id: item.id,
+                  access_token: user.ig_access_token,
+                  complete: function(data) {
+                    mediaCounts.push(data);
+
+                    callback();
+                  }
+                });            
+            });
+          });
+          //{users: mediaCounts}
+          // Now we have an array of functions, each containing an async task
+          // Execute all async tasks in the asyncTasks array
+          async.parallel(asyncTasks, function(err){
+            // All tasks are done now
+            if (err) return err;
+            return res.json({users: mediaCounts});        
+          });
+        }
+      });   
+      };   
+    });
+  
+});
+
 
 app.get('/visualization', ensureAuthenticatedInstagram, function (req, res){
   res.render('visualization');
